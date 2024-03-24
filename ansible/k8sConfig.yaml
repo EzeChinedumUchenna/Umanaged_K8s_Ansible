@@ -1,0 +1,113 @@
+---
+- name: Configure Managed Kubernetes
+  hosts: MasterNode_WorkerNode
+  become: yes
+
+  tasks:
+    - name: install kubectl
+      get_url:
+        url: "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl"
+        dest: "/usr/local/bin/kubectl"
+        mode: "0755"
+        owner: chinedumeze
+        group: chinedumeze
+
+- name: Generate private key for CA
+  hosts: MasterNode  # You can change this to your target host(s)
+  tasks:
+    - name: Generate private key
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/ca.key 2048
+    - name: Generate a CSR from the private key
+      command: openssl req -new -key /home/chinedumeze/kubernetes/ca.key -subj "/CN=KUBERNETES-CA" -out /home/chinedumeze/kubernetes/ca.csr
+    - name: Self-sign the CSR using its own private key 
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/ca.csr -signkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/ca.crt -days 365
+
+- name: Create a client and server key for each kubernetes components and a client cert admin user
+  hosts: MasterNode  
+  tasks:
+    - name: Generate private key for admin user
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/admin.key 2048
+    - name: Generate a CSR for admin user. Note the OU
+      command: openssl req -new -key /home/chinedumeze/kubernetes/admin.key -subj "/CN=admin/O=system:masters" -out /home/chinedumeze/kubernetes/admin.csr
+    - name: Sign the CSR for admin user using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/admin.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/admin.crt -days 1000
+
+- name: The controller Manager client certificate. Generate the kube-controller-manager client certificate and private key
+  hosts: MasterNode
+  tasks:
+    - name: Generate private key for kube-controller-manager
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-controller-manager.key 2048
+    - name: Generate a CSR for kube-controller-manager. Note the CN
+      command: openssl req -new -key /home/chinedumeze/kubernetes/kube-controller-manager.key -subj "/CN=system:kube-controller-manager" -out /home/chinedumeze/kubernetes/kube-controller-manager.csr
+    - name: Sign the CSR for admin user using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-controller-manager.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/kube-controller-manager.crt -days 1000
+
+
+- name: The kube-proxy client certificate.
+  hosts: MasterNode
+  tasks:
+    - name: Generate private key for kube-proxy
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-proxy.key 2048
+    - name: Generate a CSR for kube-proxy. Note the CN
+      command: openssl req -new -key /home/chinedumeze/kubernetes/kube-proxy.key -subj "/CN=system:kube-proxy" -out /home/chinedumeze/kubernetes/kube-proxy.csr
+    - name: Sign the CSR for admin user using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-proxy.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/kube-proxy.crt -days 1000
+
+
+- name: The kube-scheduler client certificate.
+  hosts: MasterNode
+  tasks:
+    - name: Generate private key for kube-scheduler
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-scheduler.key 2048
+    - name: Generate a CSR for kube-scheduler. Note the CN
+      command: openssl req -new -key /home/chinedumeze/kubernetes/kube-scheduler.key -subj "/CN=system:kube-scheduler" -out /home/chinedumeze/kubernetes/kube-scheduler.csr    
+    - name: Sign the CSR for admin user using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-scheduler.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/kube-scheduler.crt -days 1000
+
+
+- name: Copy openssl.cnf file to remote host
+  hosts: MasterNode
+  become: yes
+  tasks:
+    - name: Copy openssl.conf file from here to the remote directory ie /home/chinedumeze/kubernetes
+      copy:
+        src: /home/chinedumeze/ansible/openssl.cnf 
+        dest: /home/chinedumeze/kubernetes/openssl.cnf
+        owner: chinedumeze
+        group: chinedumeze
+
+- name: Copy openssl-etcd.cnf file to remote host
+  hosts: MasterNode
+  become: yes
+  tasks:
+    - name: Copy openssl-etcd.conf file from here to the remote directory ie /home/chinedumeze/kubernetes
+      copy:
+        src: /home/chinedumeze/ansible/openssl-etcd.cnf
+        dest: /home/chinedumeze/kubernetes/openssl-etcd.cnf
+        owner: chinedumeze
+        group: chinedumeze
+
+
+
+- name: Generates certs for kube-apiserver
+  hosts: MasterNode
+  tasks:
+    - name: Generate private key
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-apiserver.key 2048
+    - name: Generate a CSR from the private key
+      command: openssl req -new -key /home/chinedumeze/kubernetes/kube-apiserver.key -subj "/CN=kube-apiserver" -out /home/chinedumeze/kubernetes/kube-apiserver.csr -config /home/chinedumeze/kubernetes/openssl.cnf
+    - name: Sign the CSR for admin user using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-apiserver.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial  -out /home/chinedumeze/kubernetes/kube-apiserver.crt -extensions v3_req -extfile /home/chinedumeze/kubernetes/openssl.cnf -days 1000
+
+
+
+- name: Generates certs for ETCD
+  hosts: MasterNode
+  become: yes 
+  tasks:
+    - name: Generate private key
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/etcd-server.key 2048
+    - name: Generate a CSR from the private key
+      command: openssl req -new -key /home/chinedumeze/kubernetes/etcd-server.key -subj "/CN=etcd-server" -out /home/chinedumeze/kubernetes/etcd-server.csr -config /home/chinedumeze/kubernetes/openssl-etcd.cnf
+    - name: Sign the CSR for admin user using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/etcd-server.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial  -out /home/chinedumeze/kubernetes/openssl-etcd.cnf -extensions v3_req -extfile /home/chinedumeze/kubernetes/openssl-etcd.cnf -days 1000

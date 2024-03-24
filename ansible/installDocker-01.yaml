@@ -1,0 +1,46 @@
+---
+- name: Install Docker on Ubuntu VM
+  hosts: All_Node
+  become: yes
+
+  tasks:
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+
+    - name: Install prerequisite packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+
+    - name: Add Docker's official GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+
+    - name: Install Docker 18.06
+      apt:
+        name: docker-ce=18.06.3~ce~3-0~ubuntu
+        state: present
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+- name: This command below is required for kubernetes networking to function correctly.
+  hosts: All_Node
+  become: yes
+  tasks:
+    - name: needed for proper funtioning of the kubernetes networking
+      command: sysctl net.bridge.bridge-nf-call-iptables=1
