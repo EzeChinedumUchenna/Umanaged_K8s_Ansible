@@ -39,7 +39,7 @@
       command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-controller-manager.key 2048
     - name: Generate a CSR for kube-controller-manager. Note the CN
       command: openssl req -new -key /home/chinedumeze/kubernetes/kube-controller-manager.key -subj "/CN=system:kube-controller-manager" -out /home/chinedumeze/kubernetes/kube-controller-manager.csr
-    - name: Sign the CSR for admin user using the CA server/private cert
+    - name: Sign the CSR for controller manager using the CA server/private cert
       command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-controller-manager.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/kube-controller-manager.crt -days 1000
 
 
@@ -50,7 +50,7 @@
       command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-proxy.key 2048
     - name: Generate a CSR for kube-proxy. Note the CN
       command: openssl req -new -key /home/chinedumeze/kubernetes/kube-proxy.key -subj "/CN=system:kube-proxy" -out /home/chinedumeze/kubernetes/kube-proxy.csr
-    - name: Sign the CSR for admin user using the CA server/private cert
+    - name: Sign the CSR for kube-proxy using the CA server/private cert
       command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-proxy.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/kube-proxy.crt -days 1000
 
 
@@ -61,7 +61,7 @@
       command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-scheduler.key 2048
     - name: Generate a CSR for kube-scheduler. Note the CN
       command: openssl req -new -key /home/chinedumeze/kubernetes/kube-scheduler.key -subj "/CN=system:kube-scheduler" -out /home/chinedumeze/kubernetes/kube-scheduler.csr    
-    - name: Sign the CSR for admin user using the CA server/private cert
+    - name: Sign the CSR for kube-scheduler using the CA server/private cert
       command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-scheduler.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial -out /home/chinedumeze/kubernetes/kube-scheduler.crt -days 1000
 
 
@@ -96,7 +96,7 @@
       command: openssl genrsa -out /home/chinedumeze/kubernetes/kube-apiserver.key 2048
     - name: Generate a CSR from the private key
       command: openssl req -new -key /home/chinedumeze/kubernetes/kube-apiserver.key -subj "/CN=kube-apiserver" -out /home/chinedumeze/kubernetes/kube-apiserver.csr -config /home/chinedumeze/kubernetes/openssl.cnf
-    - name: Sign the CSR for admin user using the CA server/private cert
+    - name: Sign the CSR for kube-api using the CA server/private cert
       command: openssl x509 -req -in /home/chinedumeze/kubernetes/kube-apiserver.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial  -out /home/chinedumeze/kubernetes/kube-apiserver.crt -extensions v3_req -extfile /home/chinedumeze/kubernetes/openssl.cnf -days 1000
 
 
@@ -109,5 +109,27 @@
       command: openssl genrsa -out /home/chinedumeze/kubernetes/etcd-server.key 2048
     - name: Generate a CSR from the private key
       command: openssl req -new -key /home/chinedumeze/kubernetes/etcd-server.key -subj "/CN=etcd-server" -out /home/chinedumeze/kubernetes/etcd-server.csr -config /home/chinedumeze/kubernetes/openssl-etcd.cnf
-    - name: Sign the CSR for admin user using the CA server/private cert
-      command: openssl x509 -req -in /home/chinedumeze/kubernetes/etcd-server.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial  -out /home/chinedumeze/kubernetes/openssl-etcd.cnf -extensions v3_req -extfile /home/chinedumeze/kubernetes/openssl-etcd.cnf -days 1000
+    - name: Sign the CSR for ETCD using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/etcd-server.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial  -out /home/chinedumeze/kubernetes/etcd-server.crt -extensions v3_req -extfile /home/chinedumeze/kubernetes/openssl-etcd.cnf -days 1000
+
+
+- name: Generates certs for Service Account
+  hosts: MasterNode
+  become: yes
+  tasks:
+    - name: Generate private key
+      command: openssl genrsa -out /home/chinedumeze/kubernetes/service-account.key 2048
+    - name: Generate a CSR from the private key
+      command: openssl req -new -key /home/chinedumeze/kubernetes/service-account.key -subj "/CN=service-accounts" -out /home/chinedumeze/kubernetes/service-account.csr
+    - name: Sign the CSR for service-account using the CA server/private cert
+      command: openssl x509 -req -in /home/chinedumeze/kubernetes/service-account.csr -CA /home/chinedumeze/kubernetes/ca.crt -CAkey /home/chinedumeze/kubernetes/ca.key -CAcreateserial  -out /home/chinedumeze/kubernetes/service-account.crt -days 1000
+  
+    - name: Change owner and group of generated files to chinedumeze
+      file:
+        path: "{{ item }}"
+        owner: chinedumeze
+        group: chinedumeze
+      loop:
+        - /home/chinedumeze/kubernetes/service-account.key
+        - /home/chinedumeze/kubernetes/service-account.csr
+        - /home/chinedumeze/kubernetes/service-account.crt

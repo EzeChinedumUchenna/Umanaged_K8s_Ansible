@@ -8,5 +8,5 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
 [alt_names]
 IP.1 = 10.0.2.6
-IP.2 = 172.171.207.183
+IP.2 = 10.0.2.8
 IP.3 = 127.0.0.1
